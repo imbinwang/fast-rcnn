@@ -1,0 +1,12 @@
+EXP_DIR: "LINEMOD"
+TRAIN:
+  SCALES: !!python/tuple [480]
+  MAX_SIZE: 1000
+  USE_FLIPPED: False
+  BBOX_REG: True
+  BBOX_THRESH: 0.5
+  SNAPSHOT_ITERS: 1000
+TEST:
+  SCALES: !!python/tuple [480]
+  MAX_SIZE: 1000
+  BBOX_REG: True

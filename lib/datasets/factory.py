@@ -5,12 +5,24 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
+# this file is modified by Bin Wang(binwangsdu@gmail.com)
+# use Fast R-CNN to detect LINEMOD dataset
+
 """Factory method for easily getting imdbs by name."""
 
 __sets = {}
 
+import datasets.linemod
 import datasets.pascal_voc
 import numpy as np
+
+
+### my own dataset ###
+linemod_devkit_path = '/mnt/wb/dataset/LINEMOD4FRCNN'
+for split in ['train', 'test']:
+    name = '{}_{}'.format('linemod', split)
+    __sets[name] = (lambda split=split: datasets.linemod(split, linemod_devkit_path))
+### my own dataset ###
 
 def _selective_search_IJCV_top_k(split, year, top_k):
     """Return an imdb that uses the top k proposals from the selective search

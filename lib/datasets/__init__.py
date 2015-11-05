@@ -5,9 +5,13 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
+# this file is modified by Bin Wang(binwangsdu@gmail.com)
+# use Fast R-CNN to detect LINEMOD dataset
+
 from .imdb import imdb
 from .pascal_voc import pascal_voc
 from . import factory
+from .linemod import linemod
 
 import os.path as osp
 ROOT_DIR = osp.join(osp.dirname(__file__), '..', '..')
