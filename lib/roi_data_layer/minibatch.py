@@ -5,6 +5,12 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
+#
+# this file is modified by Bin Wang(binwangsdu@gmail.com)
+# use Fast R-CNN to detect LINEMOD dataset
+# modified by adding pose data at 2015/11/5
+#
+
 """Compute minibatch blobs for training a Fast R-CNN network."""
 
 import numpy as np
@@ -33,9 +39,11 @@ def get_minibatch(roidb, num_classes):
     labels_blob = np.zeros((0), dtype=np.float32)
     bbox_targets_blob = np.zeros((0, 4 * num_classes), dtype=np.float32)
     bbox_loss_blob = np.zeros(bbox_targets_blob.shape, dtype=np.float32)
+    pose_targets_blob = np.zeros((0, 4 * num_classes), dtype=np.float32)
+    pose_loss_blob = np.zeros(pose_targets_blob.shape, dtype=np.float32)
     # all_overlaps = []
     for im_i in xrange(num_images):
-        labels, overlaps, im_rois, bbox_targets, bbox_loss \
+        labels, overlaps, im_rois, bbox_targets, bbox_loss, pose_targets, pose_loss \
             = _sample_rois(roidb[im_i], fg_rois_per_image, rois_per_image,
                            num_classes)
 
@@ -49,6 +57,8 @@ def get_minibatch(roidb, num_classes):
         labels_blob = np.hstack((labels_blob, labels))
         bbox_targets_blob = np.vstack((bbox_targets_blob, bbox_targets))
         bbox_loss_blob = np.vstack((bbox_loss_blob, bbox_loss))
+        pose_targets_blob = np.vstack((pose_targets_blob, pose_targets))
+        pose_loss_blob = np.vstack((pose_loss_blob, pose_loss))
         # all_overlaps = np.hstack((all_overlaps, overlaps))
 
     # For debug visualizations
@@ -62,6 +72,10 @@ def get_minibatch(roidb, num_classes):
         blobs['bbox_targets'] = bbox_targets_blob
         blobs['bbox_loss_weights'] = bbox_loss_blob
 
+    if cfg.TRAIN.POSE_REG:
+        blobs['pose_targets'] = pose_targets_blob
+        blobs['pose_loss_weights'] = pose_loss_blob
+
     return blobs
 
 def _sample_rois(roidb, fg_rois_per_image, rois_per_image, num_classes):
@@ -72,6 +86,7 @@ def _sample_rois(roidb, fg_rois_per_image, rois_per_image, num_classes):
     labels = roidb['max_classes']
     overlaps = roidb['max_overlaps']
     rois = roidb['boxes']
+    poses = roidb['poses']
 
     # Select foreground RoIs as those with >= FG_THRESH overlap
     fg_inds = np.where(overlaps >= cfg.TRAIN.FG_THRESH)[0]
@@ -104,12 +119,17 @@ def _sample_rois(roidb, fg_rois_per_image, rois_per_image, num_classes):
     labels[fg_rois_per_this_image:] = 0
     overlaps = overlaps[keep_inds]
     rois = rois[keep_inds]
+    poses = poses[keep_inds]
 
     bbox_targets, bbox_loss_weights = \
             _get_bbox_regression_labels(roidb['bbox_targets'][keep_inds, :],
                                         num_classes)
 
-    return labels, overlaps, rois, bbox_targets, bbox_loss_weights
+    pose_targets, pose_loss_weights = \
+            _get_pose_regression_labels(roidb['pose_targets'][keep_inds, :],
+                                        num_classes)
+
+    return labels, overlaps, rois, bbox_targets, bbox_loss_weights, pose_targets, pose_loss_weights
 
 def _get_image_blob(roidb, scale_inds):
     """Builds an input blob from the images in the roidb at the specified
@@ -161,6 +181,30 @@ def _get_bbox_regression_labels(bbox_target_data, num_classes):
         bbox_targets[ind, start:end] = bbox_target_data[ind, 1:]
         bbox_loss_weights[ind, start:end] = [1., 1., 1., 1.]
     return bbox_targets, bbox_loss_weights
+
+def _get_pose_regression_labels(pose_target_data, num_classes):
+    """Pose regression targets are stored in a compact form in the
+    roidb.
+
+    This function expands those targets into the 4-of-4*K representation used
+    by the network (i.e. only one class has non-zero targets). The loss weights
+    are similarly expanded.
+
+    Returns:
+        pose_target_data (ndarray): N x 4K blob of regression targets
+        pose_loss_weights (ndarray): N x 4K blob of loss weights
+    """
+    clss = pose_target_data[:, 0]
+    pose_targets = np.zeros((clss.size, 4 * num_classes), dtype=np.float32)
+    pose_loss_weights = np.zeros(pose_targets.shape, dtype=np.float32)
+    inds = np.where(clss > 0)[0]
+    for ind in inds:
+        cls = clss[ind]
+        start = 4 * cls
+        end = start + 4
+        pose_targets[ind, start:end] = pose_target_data[ind, 1:]
+        pose_loss_weights[ind, start:end] = [1., 1., 1., 1.]
+    return pose_targets, pose_loss_weights
 
 def _vis_minibatch(im_blob, rois_blob, labels_blob, overlaps):
     """Visualize a mini-batch for debugging."""

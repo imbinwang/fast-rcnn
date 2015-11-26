@@ -5,6 +5,12 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
+#
+# this file is modified by Bin Wang(binwangsdu@gmail.com)
+# use Fast R-CNN to detect LINEMOD dataset
+# modified by adding pose data at 2015/11/5
+#
+
 """Transform a roidb into a trainable roidb by adding a bunch of metadata."""
 
 import numpy as np
@@ -122,4 +128,77 @@ def _compute_targets(rois, overlaps, labels):
     targets[ex_inds, 2] = targets_dy
     targets[ex_inds, 3] = targets_dw
     targets[ex_inds, 4] = targets_dh
+    return targets
+
+# add pose regression function
+def add_pose_regression_targets(roidb):
+    """Add information needed to train pose regressors."""
+    assert len(roidb) > 0
+    assert 'max_classes' in roidb[0], 'Did you call prepare_roidb first?'
+
+    num_images = len(roidb)
+    # Infer number of classes from the number of columns in gt_overlaps
+    num_classes = roidb[0]['gt_overlaps'].shape[1]
+    for im_i in xrange(num_images):
+        rois = roidb[im_i]['boxes']
+        poses = roidb[im_i]['poses']
+        max_overlaps = roidb[im_i]['max_overlaps']
+        max_classes = roidb[im_i]['max_classes']
+        roidb[im_i]['pose_targets'] = \
+                _compute_pose_targets(rois, poses, max_overlaps, max_classes)
+
+    # Compute values needed for means and stds
+    # var(x) = E(x^2) - E(x)^2
+    class_counts = np.zeros((num_classes, 1)) + cfg.EPS
+    sums = np.zeros((num_classes, 4))
+    squared_sums = np.zeros((num_classes, 4))
+    for im_i in xrange(num_images):
+        targets = roidb[im_i]['pose_targets']
+        for cls in xrange(1, num_classes):
+            cls_inds = np.where(targets[:, 0] == cls)[0]
+            if cls_inds.size > 0:
+                class_counts[cls] += cls_inds.size
+                sums[cls, :] += targets[cls_inds, 1:].sum(axis=0)
+                squared_sums[cls, :] += (targets[cls_inds, 1:] ** 2).sum(axis=0)
+
+    means = sums / class_counts
+    stds = np.sqrt(squared_sums / class_counts - means ** 2)
+
+    # Normalize targets
+    for im_i in xrange(num_images):
+        targets = roidb[im_i]['pose_targets']
+        for cls in xrange(1, num_classes):
+            cls_inds = np.where(targets[:, 0] == cls)[0]
+            roidb[im_i]['pose_targets'][cls_inds, 1:] -= means[cls, :]
+            roidb[im_i]['pose_targets'][cls_inds, 1:] /= stds[cls, :]
+
+    # These values will be needed for making predictions
+    # (the predicts will need to be unnormalized and uncentered)
+    return means.ravel(), stds.ravel()
+
+def _compute_pose_targets(rois, poses, overlaps, labels):
+    """Compute pose regression targets for an image."""
+    # the number of rois should be equal to poses
+    assert rois.shape[0]==poses.shape[0], 'Inconsistent number between boxes and poses.'
+    # Ensure ROIs are floats
+    rois = rois.astype(np.float, copy=False)
+
+    # Indices of ground-truth ROIs
+    gt_inds = np.where(overlaps == 1)[0]
+    # Indices of examples for which we try to make predictions
+    ex_inds = np.where(overlaps >= cfg.TRAIN.BBOX_THRESH)[0]
+
+    # Get IoU overlap between each ex ROI and gt ROI
+    ex_gt_overlaps = utils.cython_bbox.bbox_overlaps(rois[ex_inds, :],
+                                                     rois[gt_inds, :])
+
+    # Find which gt ROI each ex ROI has max overlap with:
+    # this will be the ex ROI's gt target
+    gt_assignment = ex_gt_overlaps.argmax(axis=1)
+    gt_poses = poses[gt_inds[gt_assignment], :]
+    #ex_poses = poses[ex_inds, :]
+    
+    targets = np.zeros((rois.shape[0], 5), dtype=np.float32)
+    targets[ex_inds, 0] = labels[ex_inds]
+    targets[ex_inds, 1:5] = gt_poses
     return targets

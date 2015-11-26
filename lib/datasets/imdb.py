@@ -5,6 +5,12 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
+#
+# this file is modified by Bin Wang(binwangsdu@gmail.com)
+# use Fast R-CNN to detect LINEMOD dataset
+# modified by adding pose data at 2015/11/5
+#
+
 import os
 import os.path as osp
 import PIL
@@ -174,7 +180,9 @@ class imdb(object):
                           'gt_classes' : np.zeros((num_boxes,),
                                                   dtype=np.int32),
                           'gt_overlaps' : overlaps,
-                          'flipped' : False})
+                          'flipped' : False,
+                          'poses' : np.zeros((num_boxes, 4),
+                                                  dtype=np.float32)})
         return roidb
 
     @staticmethod
@@ -186,6 +194,7 @@ class imdb(object):
                                             b[i]['gt_classes']))
             a[i]['gt_overlaps'] = scipy.sparse.vstack([a[i]['gt_overlaps'],
                                                        b[i]['gt_overlaps']])
+            a[i]['poses'] = np.vstack((a[i]['poses'], b[i]['poses']))
         return a
 
     def competition_mode(self, on):

@@ -5,6 +5,12 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
+#
+# this file is modified by Bin Wang(binwangsdu@gmail.com)
+# use Fast R-CNN to detect LINEMOD dataset
+# modified by adding pose regression at 2015/11/5
+#
+
 """Fast R-CNN config system.
 
 This file specifies default config options for Fast R-CNN. You should not
@@ -67,6 +73,9 @@ __C.TRAIN.BBOX_REG = True
 # be used as a bounding-box regression training example
 __C.TRAIN.BBOX_THRESH = 0.5
 
+# Train pose regressors
+__C.TRAIN.POSE_REG = False
+
 # Iterations between snapshots
 __C.TRAIN.SNAPSHOT_ITERS = 10000
 
@@ -101,6 +110,9 @@ __C.TEST.SVM = False
 
 # Test using bounding-box regressors
 __C.TEST.BBOX_REG = True
+
+# Test using pose regressors
+__C.TEST.POSE_REG = False
 
 #
 # MISC

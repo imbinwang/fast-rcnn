@@ -5,6 +5,12 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
+#
+# this file is modified by Bin Wang(binwangsdu@gmail.com)
+# use Fast R-CNN to detect LINEMOD dataset
+# modified by adding pose data at 2015/11/6
+#
+
 """Test a Fast R-CNN network on an imdb (image database)."""
 
 from fast_rcnn.config import cfg, get_output_dir
@@ -139,6 +145,44 @@ def _bbox_pred(boxes, box_deltas):
 
     return pred_boxes
 
+def _bbox_pred_2(boxes, im_scales, blob_rois, box_deltas):
+    """Transform the set of class-agnostic boxes into class-specific boxes
+    by applying the predicted offsets (box_deltas)
+    """
+    if boxes.shape[0] == 0:
+        return np.zeros((0, box_deltas.shape[1]))
+
+    box_levels = blob_rois[:,0].astype(np.int, copy=True)
+    box_scales = im_scales[box_levels]
+
+    boxes = boxes.astype(np.float, copy=False)
+    widths = boxes[:, 2] - boxes[:, 0] + cfg.EPS
+    heights = boxes[:, 3] - boxes[:, 1] + cfg.EPS
+    ctr_x = boxes[:, 0] + 0.5 * widths
+    ctr_y = boxes[:, 1] + 0.5 * heights
+
+    dx = box_deltas[:, 0::4]/box_scales[:, np.newaxis]
+    dy = box_deltas[:, 1::4]/box_scales[:, np.newaxis]
+    dw = box_deltas[:, 2::4]/box_scales[:, np.newaxis]
+    dh = box_deltas[:, 3::4]/box_scales[:, np.newaxis]
+
+    pred_ctr_x = dx * widths[:, np.newaxis] + ctr_x[:, np.newaxis]
+    pred_ctr_y = dy * heights[:, np.newaxis] + ctr_y[:, np.newaxis]
+    pred_w = np.exp(dw) * widths[:, np.newaxis]
+    pred_h = np.exp(dh) * heights[:, np.newaxis]
+
+    pred_boxes = np.zeros(box_deltas.shape)
+    # x1
+    pred_boxes[:, 0::4] = pred_ctr_x - 0.5 * pred_w
+    # y1
+    pred_boxes[:, 1::4] = pred_ctr_y - 0.5 * pred_h
+    # x2
+    pred_boxes[:, 2::4] = pred_ctr_x + 0.5 * pred_w
+    # y2
+    pred_boxes[:, 3::4] = pred_ctr_y + 0.5 * pred_h
+
+    return pred_boxes
+
 def _clip_boxes(boxes, im_shape):
     """Clip boxes to image boundaries."""
     # x1 >= 0
@@ -195,6 +239,7 @@ def im_detect(net, im, boxes):
         # Apply bounding-box regression deltas
         box_deltas = blobs_out['bbox_pred']
         pred_boxes = _bbox_pred(boxes, box_deltas)
+        #pred_boxes = _bbox_pred_2(boxes, unused_im_scale_factors, blobs['rois'], box_deltas)
         pred_boxes = _clip_boxes(pred_boxes, im.shape)
     else:
         # Simply repeat the boxes, once for each class
@@ -206,6 +251,73 @@ def im_detect(net, im, boxes):
         pred_boxes = pred_boxes[inv_index, :]
 
     return scores, pred_boxes
+
+def im_detect_pose(net, im, boxes):
+    """Detect object classes in an image given object proposals.
+       Add pose regression.
+
+    Arguments:
+        net (caffe.Net): Fast R-CNN network to use
+        im (ndarray): color image to test (in BGR order)
+        boxes (ndarray): R x 4 array of object proposals
+
+    Returns:
+        scores (ndarray): R x K array of object class scores (K includes
+            background as object category 0)
+        boxes (ndarray): R x (4*K) array of predicted bounding boxes
+        poses (ndarray): R x (4*K) array of predicted poses
+    """
+    blobs, unused_im_scale_factors = _get_blobs(im, boxes)
+
+    # When mapping from image ROIs to feature map ROIs, there's some aliasing
+    # (some distinct image ROIs get mapped to the same feature ROI).
+    # Here, we identify duplicate feature ROIs, so we only compute features
+    # on the unique subset.
+    if cfg.DEDUP_BOXES > 0:
+        v = np.array([1, 1e3, 1e6, 1e9, 1e12])
+        hashes = np.round(blobs['rois'] * cfg.DEDUP_BOXES).dot(v)
+        _, index, inv_index = np.unique(hashes, return_index=True,
+                                        return_inverse=True)
+        blobs['rois'] = blobs['rois'][index, :]
+        boxes = boxes[index, :]
+
+    # reshape network inputs
+    net.blobs['data'].reshape(*(blobs['data'].shape))
+    net.blobs['rois'].reshape(*(blobs['rois'].shape))
+    blobs_out = net.forward(data=blobs['data'].astype(np.float32, copy=False),
+                            rois=blobs['rois'].astype(np.float32, copy=False))
+    if cfg.TEST.SVM:
+        # use the raw scores before softmax under the assumption they
+        # were trained as linear SVMs
+        scores = net.blobs['cls_score'].data
+    else:
+        # use softmax estimated probabilities
+        scores = blobs_out['cls_prob']
+
+    if cfg.TEST.BBOX_REG:
+        # Apply bounding-box regression deltas
+        box_deltas = blobs_out['bbox_pred']
+        pred_boxes = _bbox_pred(boxes, box_deltas)
+        #pred_boxes = _bbox_pred_2(boxes, unused_im_scale_factors, blobs['rois'], box_deltas)
+        pred_boxes = _clip_boxes(pred_boxes, im.shape)
+    else:
+        # Simply repeat the boxes, once for each class
+        pred_boxes = np.tile(boxes, (1, scores.shape[1]))
+
+    if cfg.TEST.POSE_REG:
+        # Get pose regression output
+        pred_poses = blobs_out['pose_pred']
+    else:
+        # Simply repeat the poses, once for each class
+        pred_poses = np.zeros((scores.shape[0], 4*scores.shape[1]), dtype=np.float32)
+
+    if cfg.DEDUP_BOXES > 0:
+        # Map scores and predictions back to the original set of boxes
+        scores = scores[inv_index, :]
+        pred_boxes = pred_boxes[inv_index, :]
+        pred_poses = pred_poses[inv_index, :]
+
+    return scores, pred_boxes, pred_poses
 
 def vis_detections(im, class_name, dets, thresh=0.3):
     """Visual debugging of detections."""

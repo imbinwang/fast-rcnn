@@ -5,6 +5,12 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
+#
+# this file is modified by Bin Wang(binwangsdu@gmail.com)
+# use Fast R-CNN to detect LINEMOD dataset
+# modified by adding pose data at 2015/11/6
+#
+
 """Train a Fast R-CNN network."""
 
 import caffe
@@ -33,6 +39,11 @@ class SolverWrapper(object):
                 rdl_roidb.add_bbox_regression_targets(roidb)
         print 'done'
 
+        print 'Computing pose regression targets...'
+        self.pose_means, self.pose_stds = \
+                rdl_roidb.add_pose_regression_targets(roidb)
+        print 'done'
+
         self.solver = caffe.SGDSolver(solver_prototxt)
         if pretrained_model is not None:
             print ('Loading pretrained model '
@@ -47,7 +58,8 @@ class SolverWrapper(object):
 
     def snapshot(self):
         """Take a snapshot of the network after unnormalizing the learned
-        bounding-box regression weights. This enables easy use at test-time.
+        bounding-box regression weights, also unnormalizing the learned
+        pose regression weights. This enables easy use at test-time.
         """
         net = self.solver.net
 
@@ -63,6 +75,19 @@ class SolverWrapper(object):
             net.params['bbox_pred'][1].data[...] = \
                     (net.params['bbox_pred'][1].data *
                      self.bbox_stds + self.bbox_means)
+
+        if cfg.TRAIN.POSE_REG:
+            # save original values
+            pose_orig_0 = net.params['pose_pred'][0].data.copy()
+            pose_orig_1 = net.params['pose_pred'][1].data.copy()
+
+            # scale and shift with bbox reg unnormalization; then save snapshot
+            net.params['pose_pred'][0].data[...] = \
+                    (net.params['pose_pred'][0].data *
+                     self.pose_stds[:, np.newaxis])
+            net.params['pose_pred'][1].data[...] = \
+                    (net.params['pose_pred'][1].data *
+                     self.pose_stds + self.pose_means)
 
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
@@ -80,6 +105,11 @@ class SolverWrapper(object):
             # restore net to original state
             net.params['bbox_pred'][0].data[...] = orig_0
             net.params['bbox_pred'][1].data[...] = orig_1
+
+        if cfg.TRAIN.POSE_REG:
+            # restore net to original state
+            net.params['pose_pred'][0].data[...] = pose_orig_0
+            net.params['pose_pred'][1].data[...] = pose_orig_1
 
     def train_model(self, max_iters):
         """Network training loop."""

@@ -5,6 +5,12 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
+#
+# this file is modified by Bin Wang(binwangsdu@gmail.com)
+# use Fast R-CNN to detect LINEMOD dataset
+# modified by adding pose data at 2015/11/4
+#
+
 """The data layer used during training to train a Fast R-CNN network.
 
 RoIDataLayer implements a Caffe Python layer.
@@ -102,6 +108,18 @@ class RoIDataLayer(caffe.Layer):
             # bbox_loss_weights blob: At most 4 targets per roi are active;
             # thisbinary vector sepcifies the subset of active targets
             top[4].reshape(1, self._num_classes * 4)
+
+        if cfg.TRAIN.POSE_REG:
+            self._name_to_top_map['pose_targets'] = 5
+            self._name_to_top_map['pose_loss_weights'] = 6
+
+            # pose_targets blob: R pose regression targets with 4
+            # targets per class (use quaternion to represent rotation pose)
+            top[5].reshape(1, self._num_classes * 4)
+
+            # pose_loss_weights blob: At most 4 targets per roi are active;
+            # this binary vector sepcifies the subset of active targets
+            top[6].reshape(1, self._num_classes * 4)
 
     def forward(self, bottom, top):
         """Get blobs and copy them into this layer's top blob vector."""

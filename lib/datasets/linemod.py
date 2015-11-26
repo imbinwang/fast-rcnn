@@ -5,8 +5,11 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
+#
 # this file is writen by Bin Wang(binwangsdu@gmail.com)
 # use Fast R-CNN to detect LINEMOD dataset
+# modified by adding pose data at 2015/11/5
+#
 
 import datasets
 import datasets.linemod
@@ -20,7 +23,7 @@ import utils.cython_bbox
 import cPickle
 import subprocess
 
-# hacked for my own data
+# modified for LINEMOD dataset
 class linemod(datasets.imdb):
     def __init__(self, image_set, devkit_path=None):
         datasets.imdb.__init__(self, image_set)
@@ -190,16 +193,23 @@ class linemod(datasets.imdb):
         Load image and bounding boxes info from txt files of LINEMOD dataset.
         """
         filename = os.path.join(self._data_path, 'Annotations', index + '.txt')
+        pose_filename = os.path.join(self._data_path, 'Annotations', index + '_qt.txt')
         # print 'Loading: {}'.format(filename)
         with open(filename) as f:
             data = f.readlines()
+        with open(pose_filename) as f:
+            pose_data = f.readlines()
 
         objs = data
         num_objs = len(objs)
 
+        assert num_objs==len(pose_data), \
+            'Inconsistent annotation bounding box data and pose data.'
+
         boxes = np.zeros((num_objs, 4), dtype=np.uint16)
         gt_classes = np.zeros((num_objs), dtype=np.int32)
         overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
+        poses = np.zeros((num_objs, 4), dtype=np.float32) # just for quaternion(rotation params)
 
         # Load object bounding boxes into a data frame.
         for ix, obj in enumerate(objs):
@@ -217,10 +227,25 @@ class linemod(datasets.imdb):
 
         overlaps = scipy.sparse.csr_matrix(overlaps)
 
+        # Load object poses into a data frame.
+        for ix, pose in enumerate(pose_data):
+            cls_pose = pose.strip().split(' ')
+            cls_name = cls_pose[0]
+            q1 = float(cls_pose[1])
+            q2 = float(cls_pose[2])
+            q3 = float(cls_pose[3])
+            q4 = float(cls_pose[4])
+            cls = self._class_to_ind[cls_name]
+            # just check the id
+            assert cls==gt_classes[ix], \
+                'Inconsistent class name for annotated bounding box data and pose data.'
+            poses[ix, :] = [q1, q2, q3, q4]
+
         return {'boxes' : boxes,
                 'gt_classes': gt_classes,
                 'gt_overlaps' : overlaps,
-                'flipped' : False}
+                'flipped' : False,
+                'poses' : poses}
 
     def _write_linemod_results_file(self, all_boxes):
         use_salt = self.config['use_salt']
