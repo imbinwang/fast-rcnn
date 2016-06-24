@@ -12,7 +12,7 @@
 #
 
 import datasets
-import datasets.linemod
+import datasets.linemod_sub
 import os
 import datasets.imdb
 import xml.dom.minidom as minidom
@@ -25,7 +25,7 @@ import subprocess
 import h5py
 
 # modified for LINEMOD dataset
-class linemod(datasets.imdb):
+class linemod_sub(datasets.imdb):
     def __init__(self, image_set, devkit_path=None):
         datasets.imdb.__init__(self, image_set)
         self._image_set = image_set
@@ -33,9 +33,7 @@ class linemod(datasets.imdb):
                             else devkit_path
         self._data_path = os.path.join(self._devkit_path, 'data')
         self._classes = ('__background__', # always index 0
-                         'ape', 'benchviseblue', 'bowl', 'cam', 'can', 
-                         'cat', 'cup', 'driller', 'duck', 'eggbox', 
-                         'glue', 'holepuncher', 'iron', 'lamp', 'phone')
+                         'ape', 'benchviseblue', 'bowl', 'cam')
         self._class_to_ind = dict(zip(self.classes, xrange(self.num_classes)))
         self._image_ext = ['.jpg', '.png']
         self._image_index = self._load_image_set_index()
@@ -308,6 +306,6 @@ class linemod(datasets.imdb):
             self.config['cleanup'] = True
 
 if __name__ == '__main__':
-    d = datasets.linemod('train', '')
+    d = datasets.linemod_sub('train', '')
     res = d.roidb
     from IPython import embed; embed()

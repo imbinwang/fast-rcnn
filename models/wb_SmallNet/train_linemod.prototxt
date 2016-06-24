@@ -1,0 +1,304 @@
+name: "SmallNet"
+layer {
+  name: 'data'
+  type: 'Python'
+  top: 'data'
+  top: 'rois'
+  top: 'labels'
+  top: 'bbox_targets'
+  top: 'bbox_loss_weights'
+  python_param {
+    module: 'roi_data_layer.layer'
+    layer: 'RoIDataLayer'
+    param_str: "'num_classes': 16"
+  }
+}
+layer {
+  name: "conv1"
+  type: "Convolution"
+  bottom: "data"
+  top: "conv1"
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 96
+    kernel_size: 11
+    pad: 5
+    stride: 4
+  }
+}
+layer {
+  name: "relu1"
+  type: "ReLU"
+  bottom: "conv1"
+  top: "conv1"
+}
+layer {
+  name: "pool1"
+  type: "Pooling"
+  bottom: "conv1"
+  top: "pool1"
+  pooling_param {
+    pool: MAX
+    kernel_size: 3
+    pad: 1
+    stride: 2
+  }
+}
+layer {
+  name: "norm1"
+  type: "LRN"
+  bottom: "pool1"
+  top: "norm1"
+  lrn_param {
+    local_size: 5
+    alpha: 0.0001
+    beta: 0.75
+  }
+}
+layer {
+  name: "conv2_s"
+  type: "Convolution"
+  bottom: "norm1"
+  top: "conv2_s"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 16
+    kernel_size: 5
+    pad: 2
+    group: 2
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "relu2_s"
+  type: "ReLU"
+  bottom: "conv2_s"
+  top: "conv2_s"
+}
+layer {
+  name: "pool2_s"
+  type: "Pooling"
+  bottom: "conv2_s"
+  top: "pool2_s"
+  pooling_param {
+    pool: MAX
+    kernel_size: 3
+    pad: 1
+    stride: 2
+  }
+}
+layer {
+  name: "norm2_s"
+  type: "LRN"
+  bottom: "pool2_s"
+  top: "norm2_s"
+  lrn_param {
+    local_size: 5
+    alpha: 0.0001
+    beta: 0.75
+  }
+}
+layer {
+  name: "conv3_s"
+  type: "Convolution"
+  bottom: "norm2_s"
+  top: "conv3_s"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 8
+    kernel_size: 3
+    pad: 1
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "relu3_s"
+  type: "ReLU"
+  bottom: "conv3_s"
+  top: "conv3_s"
+}
+layer {
+  name: "roi_pool3_s"
+  type: "ROIPooling"
+  bottom: "conv3_s"
+  bottom: "rois"
+  top: "pool3_s"
+  roi_pooling_param {
+    pooled_w: 6
+    pooled_h: 6
+    spatial_scale: 0.0625 # 1/16
+  }
+}
+layer {
+  name: "fc4_s"
+  type: "InnerProduct"
+  bottom: "pool3_s"
+  top: "fc4_s"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 256
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "relu4_s"
+  type: "ReLU"
+  bottom: "fc4_s"
+  top: "fc4_s"
+}
+layer {
+  name: "drop4_s"
+  type: "Dropout"
+  bottom: "fc4_s"
+  top: "fc4_s"
+  dropout_param {
+    dropout_ratio: 0.5
+  }
+}
+layer {
+  name: "fc5_s"
+  type: "InnerProduct"
+  bottom: "fc4_s"
+  top: "fc5_s"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 32
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "relu5_s"
+  type: "ReLU"
+  bottom: "fc5_s"
+  top: "fc5_s"
+}
+layer {
+  name: "cls_score"
+  type: "InnerProduct"
+  bottom: "fc5_s"
+  top: "cls_score"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 16
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "bbox_pred"
+  type: "InnerProduct"
+  bottom: "fc5_s"
+  top: "bbox_pred"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 64
+    weight_filler {
+      type: "gaussian"
+      std: 0.001
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "loss_cls"
+  type: "SoftmaxWithLoss"
+  bottom: "cls_score"
+  bottom: "labels"
+  top: "loss_cls"
+  loss_weight: 1
+}
+layer {
+  name: "loss_bbox"
+  type: "SmoothL1Loss"
+  bottom: "bbox_pred"
+  bottom: "bbox_targets"
+  bottom: "bbox_loss_weights"
+  top: "loss_bbox"
+  loss_weight: 1
+}

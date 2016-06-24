@@ -7,6 +7,7 @@ TRAIN:
   USE_FLIPPED: False
   BBOX_REG: True
   BBOX_THRESH: 0.5
+  FG_THRESH: 0.5
   SNAPSHOT_ITERS: 500000
 TEST:
   SCALES: !!python/tuple [480]

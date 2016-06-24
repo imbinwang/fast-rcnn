@@ -13,15 +13,57 @@
 __sets = {}
 
 import datasets.linemod
+import datasets.linemod_sub
 import datasets.pascal_voc
 import numpy as np
 
 
 ### my own dataset ###
+
+#------ real images for training and testing ------
 linemod_devkit_path = '/mnt/wb/dataset/LINEMOD4FRCNN'
 for split in ['train', 'test']:
     name = '{}_{}'.format('linemod', split)
     __sets[name] = (lambda split=split: datasets.linemod(split, linemod_devkit_path))
+#------ real images ------
+
+#------ synthesised images for training, real images for testing ------
+linemod_comp_devkit_path = '/mnt/wb/dataset/LINEMOD_COMP4FRCNN'
+for split in ['train', 'test']:
+    name = '{}_{}'.format('linemod_comp', split)
+    __sets[name] = (lambda split=split: datasets.linemod(split, linemod_comp_devkit_path))
+#------ synthesised images for training, real images for testing ------
+
+linemod_v_devkit_path = '/mnt/wb/dataset/LINEMOD_V4FRCNN'
+for split in ['train', 'test']:
+    name = '{}_{}'.format('linemod_v', split)
+    __sets[name] = (lambda split=split: datasets.linemod(split, linemod_v_devkit_path))
+
+linemod_bg_devkit_path = '/mnt/wb/dataset/LINEMOD_BG4FRCNN'
+for split in ['train', 'test']:
+    name = '{}_{}'.format('linemod_bg', split)
+    __sets[name] = (lambda split=split: datasets.linemod(split, linemod_bg_devkit_path))
+
+linemod_black_devkit_path = '/mnt/wb/dataset/LINEMOD_BLACK4FRCNN'
+for split in ['train', 'test']:
+    name = '{}_{}'.format('linemod_black', split)
+    __sets[name] = (lambda split=split: datasets.linemod(split, linemod_black_devkit_path))
+
+linemod_ror_devkit_path = '/mnt/wb/dataset/LINEMOD_ROR4FRCNN'
+for split in ['train', 'test']:
+    name = '{}_{}'.format('linemod_ror', split)
+    __sets[name] = (lambda split=split: datasets.linemod_sub(split, linemod_ror_devkit_path))
+
+linemod_bgsub_devkit_path = '/mnt/wb/dataset/LINEMOD_BGSUB4FRCNN'
+for split in ['train', 'test']:
+    name = '{}_{}'.format('linemod_bgsub', split)
+    __sets[name] = (lambda split=split: datasets.linemod_sub(split, linemod_bgsub_devkit_path))
+
+linemod_largesub_devkit_path = '/mnt/wb/dataset/LINEMOD_LARGE4FRCNN'
+for split in ['train', 'test']:
+    name = '{}_{}'.format('linemod_largesub', split)
+    __sets[name] = (lambda split=split: datasets.linemod_sub(split, linemod_largesub_devkit_path))
+
 ### my own dataset ###
 
 def _selective_search_IJCV_top_k(split, year, top_k):

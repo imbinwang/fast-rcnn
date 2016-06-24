@@ -58,12 +58,9 @@ NETS = {'detect_net_1200k': ('wb_CaffeNet',
         'detect_net_comp_10k': ('wb_CaffeNet',
                      'test_linemod.prototxt',
                      'caffenet_comp_2_iter_500000.caffemodel'),
-        'detect_net_sub_60k': ('wb_CaffeNet',
+        'detect_net_sub_200k': ('wb_CaffeNet',
                      'test_linemod_sub.prototxt',
-                     'caffenet_largesub_2_iter_60000.caffemodel'),
-        'pose_net_sub_30k': ('wb_CaffeNet',
-                     'test_linemod_sub_pose_reg.prototxt',
-                     'caffenet_largesub_pose_reg_iter_30000.caffemodel'),
+                     'caffenet_largesub_iter_2000000.caffemodel'),
         'detect_net_small_2000k': ('wb_SmallNet',
                      'test_linemod.prototxt',
                      'smallnet_comp_2_iter_2000000.caffemodel'),
@@ -127,7 +124,7 @@ def vis_detections(im, classes_name, all_dets, pose_reg, img_path=None, txt_path
                         bbox=dict(facecolor='blue', alpha=0.5),
                         fontsize=10, color='white')
                 if txt_path is not None:
-                    txt_file.write(' {0[0]} {0[1]} {0[2]} {0[3]}\n'.format(pose))  
+                    txt_file.write(' {0[0]} {0[1]} {0[2]} {0[3]}\n'.format(pose))
             else:
                 ax.text(bbox[0], bbox[1] - 2,
                         '{:s} {:.3f}'.format(classes_name[cls], score),
@@ -161,7 +158,7 @@ def detect_estimate_pose(net, im, obj_proposal, classes, pose_reg, img_path, txt
 
     # Visualize detections for each class
     all_dets = [[] for _ in xrange(len(classes))]
-    CONF_THRESH = 0.8
+    CONF_THRESH = 0.1
     NMS_THRESH = 0.3
     i = 0
     for cls in classes:
@@ -194,7 +191,7 @@ def detect_estimate_pose(net, im, obj_proposal, classes, pose_reg, img_path, txt
 
 def parse_args():
     """Parse input arguments."""
-    parser = argparse.ArgumentParser(description='Use a Fast R-CNN network to detect and estimate pose.')
+    parser = argparse.ArgumentParser(description='Train a Fast R-CNN network')
     parser.add_argument('--gpu', dest='gpu_id', help='GPU device id to use [0]',
                         default=0, type=int)
     parser.add_argument('--cpu', dest='cpu_mode',
@@ -258,16 +255,9 @@ if __name__ == '__main__':
     raw_boxes = np.array([np.transpose(a) for a in box_data])
 
     # detect on each image
-    for i in range(len(image_pathes)):
+    #for i in range(len(image_pathes)):
+    for i in range(4194,5300):
         im = cv2.imread(image_pathes[i])
         # change the box format from matlab(1-based index, colomn major) to python format(0-based index, row major)
         obj_proposals = raw_boxes[i][:, (1, 0, 3, 2)]-1
-        if i>=0 and i<1236:
-            TO_BE_CLASS = CLASSES[1]
-        if i>=1236 and i<2451:
-            TO_BE_CLASS = CLASSES[2]
-        if i>=2451 and i<3684:
-            TO_BE_CLASS = CLASSES[3]
-        if i>=3684 and i<4885:
-            TO_BE_CLASS = CLASSES[4]
-        detect_estimate_pose(net, im, obj_proposals, [TO_BE_CLASS], cfg.TEST.POSE_REG, det_image_pathes[i], det_txt_pathes[i])
+        detect_estimate_pose(net, im, obj_proposals, CLASSES[1:5], cfg.TEST.POSE_REG, det_image_pathes[i], None)
